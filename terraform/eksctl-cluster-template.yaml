@@ -1,0 +1,73 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: ekstest
+  region: ap-northeast-1
+  version: "1.15"
+vpc:
+  id: "${vpc.id}"
+  cidr: "${vpc.cidr_block}"
+  subnets:
+    public:
+%{ for subnet in public_subnets ~}
+      ${ subnet.availability_zone }:
+        id: "${ subnet.id }"
+        cidr: "${ subnet.cidr_block }"
+%{ endfor ~}
+    private:
+%{ for subnet in private_subnets ~}
+      ${ subnet.availability_zone }:
+        id: "${ subnet.id }"
+        cidr: "${ subnet.cidr_block }"
+%{ endfor ~}
+
+nodeGroups:
+  - name: ng1-v1-15
+    instanceType: mixed
+    amiFamily: AmazonLinux2
+    minSize: 1
+    maxSize: 1
+    volumeSize: 20
+    volumeEncrypted: true
+    privateNetworking: true
+    preBootstrapCommands:
+      - "yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
+      - "systemctl enable amazon-ssm-agent"
+      - "systemctl start amazon-ssm-agent"
+    iam:
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      withAddonPolicies:
+        autoScaler: true
+        externalDNS: true
+        certManager: true
+        ebs: true
+        efs: true
+        albIngress: true
+        cloudWatch: true
+%{ if length(node_labels) > 0 ~}
+    labels:
+%{ for label in node_labels ~}
+      ${ label.name }: "${ label.value }"
+%{ endfor ~}
+%{ endif ~}
+#    ssh:
+#      allow: true
+    instancesDistribution:
+      instanceTypes:
+        - t3a.medium
+      onDemandBaseCapacity: 0
+      onDemandPercentageAboveBaseCapacity: 0
+      spotInstancePools: 1
+
+%{ if length(log_types) > 0 ~}
+cloudWatch:
+  clusterLogging:
+    enableTypes:
+%{ for type in log_types ~}
+      - "${ type }"
+%{ endfor ~}
+%{ endif ~}

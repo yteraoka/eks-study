@@ -1,0 +1,4 @@
+backend.auto.tfvars
+eksctl-cluster-generated.yaml
+.terraform
+tfplan
